@@ -1,2 +1,2 @@
-2023-04-24 12:11:08: notepad.exe started by WSATKINS\PARI1218
-2023-04-24 12:11:14: notepad.exe ended
+User PARI1218 has started using explorer.exe.
+Use
