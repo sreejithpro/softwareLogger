@@ -1,12 +1,36 @@
-import os
+import csv
+import datetime
 import psutil
 import win32api
 import tkinter as tk
 from tkinter import ttk
 
 process_names = ["notepad.exe", "calc.exe", "explorer.exe"]  # Change this to the process names you want to monitor
-log_file = "process_log.txt"  # Change this to the path of the log file on the network drive
-max_lines = 100  # Change this to the maximum number of lines to keep in the log file
+log_file = "process_log.csv"  # Change this to the path of the log file on the network drive
+
+
+def get_current_time():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def log_process(process_name, username):
+    with open(log_file, "r", newline="") as f:
+        reader = csv.reader(f)
+        for line in reader:
+            if line == [process_name, username, ""]:
+                return
+    with open(log_file, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([process_name, username, get_current_time()])
+
+
+def remove_process(process_name, username):
+    with open(log_file, "r", newline="") as f:
+        reader = csv.reader(f)
+        lines = [line for line in reader if line != [process_name, username, ""]]
+    with open(log_file, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(lines)
 
 
 def check_processes():
@@ -16,49 +40,32 @@ def check_processes():
             running_processes[proc.name()] = running_processes.get(proc.name(), set())
             running_processes[proc.name()].add(proc.username())
             username = win32api.GetUserName()
-            message = f"User {username} has started using {proc.name()}."
-            with open(log_file, "r+") as f:
-                lines = f.readlines()
-                f.seek(0)
-                f.write(message + "\n")
-                f.writelines(lines)
-                f.truncate(max_lines * (len(lines) // max_lines + 1))
+            if username not in running_processes[proc.name()]:
+                log_process(proc.name(), username)
     for process_name in process_names:
-        users = sorted(running_processes.get(process_name, set()))
-        if not tree.exists(process_name):
-            tree.insert("", "end", process_name, text=process_name)
-        for i, user in enumerate(users):
-            tree.set(process_name, i + 1, user)
-        for j in range(len(users), tree.column("#") - 1):
-            tree.set(process_name, j + 1, "")
+        for child in tree.get_children():
+            if child[0] == process_name and child[1] not in running_processes.get(process_name, set()):
+                tree.delete(child)
+                remove_process(process_name, child[1])
+        for username in running_processes.get(process_name, set()):
+            if not tree.exists((process_name, username)):
+                tree.insert("", "end", (process_name, username), text=process_name, values=(username, get_current_time()))
+            else:
+                tree.set((process_name, username), 2, get_current_time())
     root.after(1000, check_processes)
-
-
-def read_log_file():
-    if os.path.exists(log_file):
-        with open(log_file, "r") as f:
-            log_data = f.read()
-    else:
-        log_data = "Log file not found."
-        with open(log_file, "w") as f:
-            pass
-    return log_data
 
 
 root = tk.Tk()
 root.title("Process Tracker")
 
-tree = ttk.Treeview(root, columns=["#" + str(i) for i in range(len(process_names) + 1)], show="headings")
-tree.heading("#0", text="")
-for i, process_name in enumerate(process_names):
-    tree.heading("#" + str(i + 1), text=process_name)
-tree.column("#0", width=100, anchor="w")
-for i in range(len(process_names)):
-    tree.column("#" + str(i + 1), width=200, anchor="w")
+tree = ttk.Treeview(root, columns=["#1", "#2", "#3"], show="headings")
+tree.heading("#1", text="Process Name")
+tree.heading("#2", text="User Name")
+tree.heading("#3", text="Start Time")
+tree.column("#1", width=100, anchor="w")
+tree.column("#2", width=200, anchor="w")
+tree.column("#3", width=200, anchor="w")
 tree.pack(padx=10, pady=10)
-
-log_label = tk.Label(root, text=read_log_file())
-log_label.pack(padx=10, pady=10)
 
 root.after(1000, check_processes)
 
