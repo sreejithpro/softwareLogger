@@ -1,0 +1,2 @@
+2023-04-24 12:11:08: notepad.exe started by WSATKINS\PARI1218
+2023-04-24 12:11:14: notepad.exe ended
